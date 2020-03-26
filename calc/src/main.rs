@@ -1,13 +1,14 @@
 use crate::Type::{EOF, INTEGER, PLUS};
-use std::io::{stdin, stdout, Read, Write};
+use std::io::{stdin, stdout, Write};
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 enum Type {
     INTEGER,
     PLUS,
     EOF,
 }
 
+#[derive(Debug)]
 struct Token {
     typ: Type,
     value: String,
@@ -65,33 +66,40 @@ impl Interpreter {
 
         if current_char.to_string() == "+".to_string() {
             self.pos += 1;
-            return Ok(Token::new(PLUS, "+".to_string()));
+            return Ok(Token::new(PLUS, current_char.to_string()));
         }
 
-        Err(format!("error parsing input: {}", current_char))
+        Err(format!("error parsing input: `{}`", current_char))
     }
 
     fn eat(&mut self, typ: Type) -> Result<(), String> {
         if self.current_token.typ == typ {
-            self.current_token = self.get_next_token().unwrap();
-            return Ok(());
+            match self.get_next_token() {
+                Ok(token) => {
+                    self.current_token = token;
+                    return Ok(());
+                }
+                Err(err) => {
+                    return Err(err);
+                }
+            }
         }
-        Err("Error parsing input".to_string())
+        return Err(format!("err token type: {:?}", typ));
     }
 
     fn expr(&mut self) -> Result<i64, String> {
-        self.current_token = self.get_next_token().expect("right expr");
+        self.current_token = self.get_next_token()?;
 
-        let left = self.current_token.clone();
-        self.eat(INTEGER);
+        let left: i64 = self.current_token.value.parse().unwrap();
+        self.eat(INTEGER)?;
 
         let _op = self.current_token.clone();
-        self.eat(PLUS);
+        self.eat(PLUS)?;
 
-        let right = self.current_token.clone();
-        self.eat(INTEGER);
+        let right: i64 = self.current_token.value.parse().unwrap();
+        self.eat(INTEGER)?;
 
-        let value = left.value.parse::<i64>().unwrap() + right.value.parse::<i64>().unwrap();
+        let value = left + right;
         return Ok(value);
     }
 }
@@ -99,13 +107,15 @@ impl Interpreter {
 fn main() {
     loop {
         print!("calc> ");
-        stdout().flush();
+        stdout().flush().unwrap();
         let mut input = String::new();
-        stdin().read_line(&mut input);
+        stdin().read_line(&mut input).unwrap();
 
         let mut interpreter = Interpreter::new(input.trim().to_string());
-        let result = interpreter.expr();
+        match interpreter.expr() {
+            Ok(value) => println!("{:?}", value),
+            Err(error) => println!("error: {}", error),
+        }
 
-        println!("{:?}", result);
     }
 }
